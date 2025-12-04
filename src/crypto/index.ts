@@ -1,1 +1,2 @@
-// AES core and mode implementations will live here.
+export * from './aes';
+export * from './config';

@@ -1,1 +1,2 @@
-// Shared utility functions (encoding, padding, etc.) will live here.
+export * from './encoding';
+export * from './padding';

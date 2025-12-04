@@ -8,3 +8,5 @@
 - Testing plan: unit tests via Vitest with NIST test vectors for AES/modes; cross-check implementation against Web Crypto only for verification.
 - Project layout (planned): `src/crypto` (AES core + modes), `src/utils` (encoding, padding), `src/ui` (components, animations), `src/state` (stores), `tests` (vectors/helpers).
 - Tooling: ESLint (flat config), Vitest (jsdom) + Testing Library, TypeScript project refs split for app/node; script `npm run test` runs once (non-watch).
+- AES core: supports 128/192/256-bit keys; block-size 16 bytes; default IV/counter factories yield zeroed blocks from central config.
+- Padding: zero-count padding utility pads to full blocks, marking pad length in the final byte; unpad validates zero fill.
