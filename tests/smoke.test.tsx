@@ -4,6 +4,6 @@ import App from '../src/App';
 describe('App scaffold', () => {
   it('renders the placeholder shell', () => {
     render(<App />);
-    expect(screen.getByText(/Project setup complete/i)).toBeInTheDocument();
+    expect(screen.getByText(/Modes Playground/i)).toBeInTheDocument();
   });
 });

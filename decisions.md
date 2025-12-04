@@ -10,5 +10,5 @@
 - Tooling: ESLint (flat config), Vitest (jsdom) + Testing Library, TypeScript project refs split for app/node; script `npm run test` runs once (non-watch).
 - AES core: supports 128/192/256-bit keys; block-size 16 bytes; default IV/counter factories yield zeroed blocks from central config.
 - Padding: zero-count padding utility pads to full blocks, marking pad length in the final byte; unpad validates zero fill.
-- Modes: ECB/CBC/CFB/OFB/CTR adapters built over the core; IV/counter defaults are zeros but injectable; optional padding flag (defaults on for non-tests) with alignment validation.
+- Modes: ECB/CBC/CFB/OFB/CTR adapters built over the core; IV/counter defaults are zeros but injectable; padding applies only to ECB/CBC. Stream modes (CFB/OFB/CTR) ignore padding and allow arbitrary lengths.
 - Verification: NIST vectors for block/modes; Web Crypto cross-checks for AES-CTR (Node webcrypto), CBC cross-check omitted due to built-in padding differences in runtime.

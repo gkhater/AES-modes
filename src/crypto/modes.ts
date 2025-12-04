@@ -101,15 +101,14 @@ export const encryptCfb = (key: ByteArray, plaintext: ByteArray, options: ModeOp
   const schedule = getSchedule(key, options.schedule);
   const iv = options.iv ?? defaultIvFactory();
   ensureBlockSized('IV', iv);
-  const input = maybePad(plaintext, options.pad);
-  const out = new Uint8Array(input.length);
+  const out = new Uint8Array(plaintext.length);
   let prev = iv;
-  for (let offset = 0; offset < input.length; offset += BLOCK_SIZE_BYTES) {
-    const block = input.subarray(offset, offset + BLOCK_SIZE_BYTES);
+  for (let offset = 0; offset < plaintext.length; offset += BLOCK_SIZE_BYTES) {
+    const block = plaintext.subarray(offset, offset + BLOCK_SIZE_BYTES);
     const keystream = encryptBlock(prev, schedule);
     const cipher = xorBlocks(block, keystream);
     out.set(cipher, offset);
-    prev = cipher;
+    prev = cipher.length === BLOCK_SIZE_BYTES ? cipher : prev;
   }
   return out;
 };
@@ -118,7 +117,6 @@ export const decryptCfb = (key: ByteArray, ciphertext: ByteArray, options: ModeO
   const schedule = getSchedule(key, options.schedule);
   const iv = options.iv ?? defaultIvFactory();
   ensureBlockSized('IV', iv);
-  if (ciphertext.length % BLOCK_SIZE_BYTES !== 0) throw new Error('Ciphertext length must align to block size');
   const out = new Uint8Array(ciphertext.length);
   let prev = iv;
   for (let offset = 0; offset < ciphertext.length; offset += BLOCK_SIZE_BYTES) {
@@ -128,19 +126,18 @@ export const decryptCfb = (key: ByteArray, ciphertext: ByteArray, options: ModeO
     out.set(plain, offset);
     prev = block;
   }
-  return maybeUnpad(out, options.pad);
+  return out;
 };
 
 export const encryptOfb = (key: ByteArray, plaintext: ByteArray, options: ModeOptions = {}): ByteArray => {
   const schedule = getSchedule(key, options.schedule);
   const iv = options.iv ?? defaultIvFactory();
   ensureBlockSized('IV', iv);
-  const input = maybePad(plaintext, options.pad);
-  const out = new Uint8Array(input.length);
+  const out = new Uint8Array(plaintext.length);
   let prev = iv;
-  for (let offset = 0; offset < input.length; offset += BLOCK_SIZE_BYTES) {
+  for (let offset = 0; offset < plaintext.length; offset += BLOCK_SIZE_BYTES) {
     const keystream = encryptBlock(prev, schedule);
-    const block = input.subarray(offset, offset + BLOCK_SIZE_BYTES);
+    const block = plaintext.subarray(offset, offset + BLOCK_SIZE_BYTES);
     const cipher = xorBlocks(block, keystream);
     out.set(cipher, offset);
     prev = keystream;
@@ -152,7 +149,6 @@ export const decryptOfb = (key: ByteArray, ciphertext: ByteArray, options: ModeO
   const schedule = getSchedule(key, options.schedule);
   const iv = options.iv ?? defaultIvFactory();
   ensureBlockSized('IV', iv);
-  if (ciphertext.length % BLOCK_SIZE_BYTES !== 0) throw new Error('Ciphertext length must align to block size');
   const out = new Uint8Array(ciphertext.length);
   let prev = iv;
   for (let offset = 0; offset < ciphertext.length; offset += BLOCK_SIZE_BYTES) {
@@ -162,7 +158,7 @@ export const decryptOfb = (key: ByteArray, ciphertext: ByteArray, options: ModeO
     out.set(plain, offset);
     prev = keystream;
   }
-  return maybeUnpad(out, options.pad);
+  return out;
 };
 
 const incrementCounter = (counter: ByteArray): ByteArray => {
@@ -178,12 +174,11 @@ export const encryptCtr = (key: ByteArray, plaintext: ByteArray, options: ModeOp
   const schedule = getSchedule(key, options.schedule);
   const initialCounter = options.counter ?? defaultCounterFactory();
   ensureBlockSized('Counter', initialCounter);
-  const input = maybePad(plaintext, options.pad);
-  const out = new Uint8Array(input.length);
+  const out = new Uint8Array(plaintext.length);
   let counter = initialCounter;
-  for (let offset = 0; offset < input.length; offset += BLOCK_SIZE_BYTES) {
+  for (let offset = 0; offset < plaintext.length; offset += BLOCK_SIZE_BYTES) {
     const keystream = encryptBlock(counter, schedule);
-    const block = input.subarray(offset, offset + BLOCK_SIZE_BYTES);
+    const block = plaintext.subarray(offset, offset + BLOCK_SIZE_BYTES);
     const cipher = xorBlocks(block, keystream);
     out.set(cipher, offset);
     counter = incrementCounter(counter);
@@ -195,7 +190,6 @@ export const decryptCtr = (key: ByteArray, ciphertext: ByteArray, options: ModeO
   const schedule = getSchedule(key, options.schedule);
   const initialCounter = options.counter ?? defaultCounterFactory();
   ensureBlockSized('Counter', initialCounter);
-  if (ciphertext.length % BLOCK_SIZE_BYTES !== 0) throw new Error('Ciphertext length must align to block size');
   const out = new Uint8Array(ciphertext.length);
   let counter = initialCounter;
   for (let offset = 0; offset < ciphertext.length; offset += BLOCK_SIZE_BYTES) {
@@ -205,5 +199,5 @@ export const decryptCtr = (key: ByteArray, ciphertext: ByteArray, options: ModeO
     out.set(plain, offset);
     counter = incrementCounter(counter);
   }
-  return maybeUnpad(out, options.pad);
+  return out;
 };
