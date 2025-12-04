@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "types": ["vitest/globals", "vitest/importMeta"],
+    "jsx": "react-jsx",
+    "noEmit": true
+  },
+  "include": ["vite.config.ts", "vitest.config.ts", "tests", "src"]
+}
