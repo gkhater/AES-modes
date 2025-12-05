@@ -15,6 +15,7 @@ import {
 } from './crypto';
 import { bytesToBase64, bytesToHex, hexToBytes, stringToUtf8Bytes, utf8BytesToString, base64ToBytes } from './utils';
 import type { AesMode, Encoding, Operation } from './types/crypto-ui';
+import { infoSections } from './content/info';
 import './App.css';
 
 interface FormState {
@@ -33,6 +34,16 @@ interface OutputState {
   base64: string;
   utf8: string;
 }
+
+interface RunResult {
+  output: OutputState;
+  encodingUsed: Encoding;
+  autoPadded: boolean;
+  ivUsed?: string;
+  counterUsed?: string;
+}
+const hexPattern = /^[0-9a-fA-F\s]+$/;
+const base64Pattern = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
 const modeLabels: Record<AesMode, string> = {
   ECB: 'ECB',
@@ -92,25 +103,32 @@ const parseBlockOrDefault = (label: string, hex: string): Uint8Array | undefined
   return bytes;
 };
 
-const runCipher = (form: FormState): OutputState => {
+const runCipher = (form: FormState): RunResult => {
   const key = parseKey(form.keyHex);
-  const iv = parseBlockOrDefault('IV', form.ivHex) ?? defaultIvFactory();
-  const counter = parseBlockOrDefault('Counter', form.counterHex) ?? defaultCounterFactory();
-  const payload = parseInput(form.text, form.inputEncoding);
+  const iv = form.mode !== 'ECB' && form.mode !== 'CTR' ? parseBlockOrDefault('IV', form.ivHex) ?? defaultIvFactory() : undefined;
+  const counter = form.mode === 'CTR' ? parseBlockOrDefault('Counter', form.counterHex) ?? defaultCounterFactory() : undefined;
+  const payloadEncoding =
+    form.operation === 'decrypt' && form.inputEncoding === 'utf8'
+      ? detectEncoding(form.text) ?? form.inputEncoding
+      : form.inputEncoding;
+  const payload = parseInput(form.text, payloadEncoding);
   const pad = form.padding;
+  const blockMode = form.mode === 'ECB' || form.mode === 'CBC';
+  const autoPad = blockMode && form.operation === 'encrypt' && pad === false && payload.length % BLOCK_BYTES !== 0;
+  const effectivePad = blockMode ? pad || autoPad : false;
 
   const encrypt = (mode: AesMode, data: Uint8Array): Uint8Array => {
     switch (mode) {
       case 'ECB':
-        return encryptEcb(key, data, { pad });
+        return encryptEcb(key, data, { pad: effectivePad });
       case 'CBC':
-        return encryptCbc(key, data, { iv, pad });
+        return encryptCbc(key, data, { iv, pad: effectivePad });
       case 'CFB':
-        return encryptCfb(key, data, { iv, pad });
+        return encryptCfb(key, data, { iv, pad: false });
       case 'OFB':
-        return encryptOfb(key, data, { iv, pad });
+        return encryptOfb(key, data, { iv, pad: false });
       case 'CTR':
-        return encryptCtr(key, data, { counter, pad });
+        return encryptCtr(key, data, { counter, pad: false });
       default:
         return data;
     }
@@ -119,28 +137,61 @@ const runCipher = (form: FormState): OutputState => {
   const decrypt = (mode: AesMode, data: Uint8Array): Uint8Array => {
     switch (mode) {
       case 'ECB':
-        return decryptEcb(key, data, { pad });
+        return decryptEcb(key, data, { pad: effectivePad });
       case 'CBC':
-        return decryptCbc(key, data, { iv, pad });
+        return decryptCbc(key, data, { iv, pad: effectivePad });
       case 'CFB':
-        return decryptCfb(key, data, { iv, pad });
+        return decryptCfb(key, data, { iv, pad: false });
       case 'OFB':
-        return decryptOfb(key, data, { iv, pad });
+        return decryptOfb(key, data, { iv, pad: false });
       case 'CTR':
-        return decryptCtr(key, data, { counter, pad });
+        return decryptCtr(key, data, { counter, pad: false });
       default:
         return data;
     }
   };
 
   const result = form.operation === 'encrypt' ? encrypt(form.mode, payload) : decrypt(form.mode, payload);
-  return formatOutputs(result);
+  return {
+    output: formatOutputs(result),
+    encodingUsed: payloadEncoding,
+    autoPadded: autoPad,
+    ivUsed: iv ? bytesToHex(iv) : undefined,
+    counterUsed: counter ? bytesToHex(counter) : undefined,
+  };
+};
+
+const detectEncoding = (value: string): Encoding | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (hexPattern.test(trimmed) && trimmed.replace(/\s+/g, '').length % 2 === 0) return 'hex';
+  if (base64Pattern.test(trimmed) && trimmed.length % 4 === 0) return 'base64';
+  return null;
+};
+
+const randomBlock = (): Uint8Array => {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const arr = new Uint8Array(BLOCK_BYTES);
+    crypto.getRandomValues(arr);
+    return arr;
+  }
+  // Weak fallback for environments without crypto (not expected in browser/Node)
+  const arr = new Uint8Array(BLOCK_BYTES);
+  for (let i = 0; i < BLOCK_BYTES; i += 1) {
+    arr[i] = Math.floor(Math.random() * 256);
+  }
+  return arr;
 };
 
 function App() {
   const [form, setForm] = useState<FormState>(defaultForm);
   const [output, setOutput] = useState<OutputState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [usedIv, setUsedIv] = useState<string | null>(null);
+  const [usedCounter, setUsedCounter] = useState<string | null>(null);
+  const [detectedEncoding, setDetectedEncoding] = useState<Encoding | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const isStreamMode = form.mode === 'CFB' || form.mode === 'OFB' || form.mode === 'CTR';
   const showIv = form.mode !== 'ECB' && form.mode !== 'CTR';
@@ -160,14 +211,53 @@ function App() {
     [form.inputEncoding, form.operation],
   );
 
+  const validateFields = (): boolean => {
+    const errs: Record<string, string> = {};
+    try {
+      parseKey(form.keyHex);
+    } catch (e) {
+      errs.key = e instanceof Error ? e.message : 'Invalid key';
+    }
+    if (showIv && form.ivHex.trim()) {
+      try {
+        parseBlockOrDefault('IV', form.ivHex);
+      } catch (e) {
+        errs.iv = e instanceof Error ? e.message : 'Invalid IV';
+      }
+    }
+    if (showCounter && form.counterHex.trim()) {
+      try {
+        parseBlockOrDefault('Counter', form.counterHex);
+      } catch (e) {
+        errs.counter = e instanceof Error ? e.message : 'Invalid counter';
+      }
+    }
+    setFieldErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
   const onSubmit = () => {
     setError(null);
+    setNotice(null);
+    setUsedIv(null);
+    setUsedCounter(null);
+    if (!validateFields()) {
+      setError('Please fix the highlighted fields.');
+      return;
+    }
     try {
       const result = runCipher(form);
-      setOutput(result);
-    } catch (err) {
+      setOutput(result.output);
+      setDetectedEncoding(result.encodingUsed !== form.inputEncoding ? result.encodingUsed : null);
+      if (result.autoPadded) {
+        setNotice('Padding was auto-applied to align data to 16 bytes for this mode.');
+      }
+      if (result.ivUsed) setUsedIv(result.ivUsed);
+      if (result.counterUsed) setUsedCounter(result.counterUsed);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? String(err.message) : 'Unexpected error';
       setOutput(null);
-      setError(err instanceof Error ? err.message : 'Unexpected error');
+      setError(message);
     }
   };
 
@@ -179,8 +269,18 @@ function App() {
     }));
   };
 
+  const onAutoFillRandom = (target: 'ivHex' | 'counterHex') => {
+    const bytes = randomBlock();
+    updateField(target, bytesToHex(bytes));
+  };
+
   const updateField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    setFieldErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[key as string];
+      return copy;
+    });
   };
 
   return (
@@ -190,7 +290,7 @@ function App() {
           <span className="brand-mark">AES</span>
           <div className="brand-text">
             <div className="brand-title">Modes Playground</div>
-            <div className="brand-subtitle">ECB · CBC · CFB · OFB · CTR</div>
+            <div className="brand-subtitle">ECB / CBC / CFB / OFB / CTR</div>
           </div>
         </div>
         <p className="tagline">
@@ -246,11 +346,13 @@ function App() {
               </label>
               <input
                 id="key"
+                className={fieldErrors.key ? 'error' : ''}
                 value={form.keyHex}
                 onChange={(e) => updateField('keyHex', e.target.value)}
                 spellCheck={false}
                 placeholder="000102... (hex)"
               />
+              {fieldErrors.key && <div className="field-error">{fieldErrors.key}</div>}
             </div>
 
             {showIv && (
@@ -260,11 +362,33 @@ function App() {
                 </label>
                 <input
                   id="iv"
+                  className={fieldErrors.iv ? 'error' : ''}
                   value={form.ivHex}
                   onChange={(e) => updateField('ivHex', e.target.value)}
                   spellCheck={false}
                   placeholder={placeholders.iv}
                 />
+                {fieldErrors.iv && <div className="field-error">{fieldErrors.iv}</div>}
+                <div className="inline-actions">
+                  <button
+                    type="button"
+                    className="small"
+                    onClick={() => onAutoFillRandom('ivHex')}
+                    title="Generate a random IV and fill the field"
+                  >
+                    Random IV
+                  </button>
+                  <button
+                    type="button"
+                    className="small ghost"
+                    onClick={() => {
+                      updateField('ivHex', '');
+                    }}
+                  >
+                    Use zeros
+                  </button>
+                  {usedIv && <span className="hint">Used IV: {usedIv}</span>}
+                </div>
               </div>
             )}
 
@@ -275,11 +399,33 @@ function App() {
                 </label>
                 <input
                   id="counter"
+                  className={fieldErrors.counter ? 'error' : ''}
                   value={form.counterHex}
                   onChange={(e) => updateField('counterHex', e.target.value)}
                   spellCheck={false}
                   placeholder={placeholders.counter}
                 />
+                {fieldErrors.counter && <div className="field-error">{fieldErrors.counter}</div>}
+                <div className="inline-actions">
+                  <button
+                    type="button"
+                    className="small"
+                    onClick={() => onAutoFillRandom('counterHex')}
+                    title="Generate a random counter and fill the field"
+                  >
+                    Random counter
+                  </button>
+                  <button
+                    type="button"
+                    className="small ghost"
+                    onClick={() => {
+                      updateField('counterHex', '');
+                    }}
+                  >
+                    Use zeros
+                  </button>
+                  {usedCounter && <span className="hint">Used counter: {usedCounter}</span>}
+                </div>
               </div>
             )}
 
@@ -320,6 +466,8 @@ function App() {
             <div className="hint">All operations occur locally in your browser</div>
           </div>
           {error && <div className="alert error">{error}</div>}
+          {notice && <div className="alert info">{notice}</div>}
+          {detectedEncoding && <div className="alert info">Detected input as {detectedEncoding.toUpperCase()} for decryption.</div>}
           {output && (
             <div className="outputs">
               <div className="output-row">
@@ -338,6 +486,22 @@ function App() {
           )}
         </section>
       </main>
+
+      <section className="card info-card">
+        <h2>How this works</h2>
+        <div className="info-grid">
+          {infoSections.map((section) => (
+            <div key={section.title} className="info-block">
+              <h3>{section.title}</h3>
+              <ul>
+                {section.body.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

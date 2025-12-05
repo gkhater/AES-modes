@@ -12,3 +12,4 @@
 - Padding: zero-count padding utility pads to full blocks, marking pad length in the final byte; unpad validates zero fill.
 - Modes: ECB/CBC/CFB/OFB/CTR adapters built over the core; IV/counter defaults are zeros but injectable; padding applies only to ECB/CBC. Stream modes (CFB/OFB/CTR) ignore padding and allow arbitrary lengths.
 - Verification: NIST vectors for block/modes; Web Crypto cross-checks for AES-CTR (Node webcrypto), CBC cross-check omitted due to built-in padding differences in runtime.
+- UI QoL: decrypt auto-detects hex/base64 when input encoding is UTF-8; ECB/CBC auto-apply padding when needed and surface a notice; stream modes hide padding. IV/counter can be randomized via UI toggles, with used values displayed. Info page content is modular via `src/content/info.ts`.
