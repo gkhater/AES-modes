@@ -650,7 +650,7 @@ def word_to_bytes(word):
     return bytes([(word >> 24) & 0xFF, (word >> 16) & 0xFF, (word >> 8) & 0xFF, word & 0xFF])
 
 
-# derive round keys
+# derive round keys frmo key 
 def expand_key(key):
     if len(key) not in (16, 24, 32):
         raise ValueError("AES key must be 128, 192, or 256 bits")
@@ -691,7 +691,7 @@ def inv_sub_bytes(state):
         state[i] = INV_SBOX[state[i]]
 
 
-# row shifts
+#what you think it is 
 def shift_rows(state):
     t = state[1]
     state[1], state[5], state[9], state[13] = state[5], state[9], state[13], t
@@ -703,7 +703,7 @@ def shift_rows(state):
     state[15], state[11], state[7], state[3] = state[11], state[7], state[3], t
 
 
-# inverse row shifts
+# what you think it is 
 def inv_shift_rows(state):
     t = state[13]
     state[13], state[9], state[5], state[1] = state[9], state[5], state[1], t
@@ -715,7 +715,7 @@ def inv_shift_rows(state):
     state[3], state[7], state[11], state[15] = state[7], state[11], state[15], t
 
 
-# mix columns
+# what you think it is 
 def mix_columns(state):
     for c in range(4):
         idx = c * 4
@@ -726,7 +726,7 @@ def mix_columns(state):
         state[idx + 3] = gf_mul(b0, 3) ^ b1 ^ b2 ^ gf_mul(b3, 2)
 
 
-# inverse mix columns
+# what you think it is 
 def inv_mix_columns(state):
     for c in range(4):
         idx = c * 4
@@ -737,7 +737,7 @@ def inv_mix_columns(state):
         state[idx + 3] = gf_mul(b0, 0x0B) ^ gf_mul(b1, 0x0D) ^ gf_mul(b2, 0x09) ^ gf_mul(b3, 0x0E)
 
 
-# AES encrypt one block
+# AES encrypt block
 def encrypt_block(block, round_keys, nr):
     if len(block) != BLOCK_SIZE:
         raise ValueError("AES block must be 16 bytes")
@@ -754,7 +754,7 @@ def encrypt_block(block, round_keys, nr):
     return bytes(state)
 
 
-# AES decrypt one block
+# AES decrypt block
 def decrypt_block(block, round_keys, nr):
     if len(block) != BLOCK_SIZE:
         raise ValueError("AES block must be 16 bytes")
@@ -771,7 +771,7 @@ def decrypt_block(block, round_keys, nr):
     return bytes(state)
 
 
-# xor two byte strings
+# xor byte strings
 def xor_bytes(a, b):
     return bytes(x ^ y for x, y in zip(a, b))
 
