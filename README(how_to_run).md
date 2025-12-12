@@ -36,9 +36,11 @@ Download: https://www.python.org/downloads/
 
 Verify installation:
 
-
+'''
 
 python --version
+
+'''
 
 
 
@@ -52,13 +54,13 @@ Download: https://nodejs.org/
 
 Verify installation:
 
-
+'''
 
 node --version
 
 npm --version
 
-
+'''
 
 1.3 Git
 
@@ -70,11 +72,11 @@ Download: https://git-scm.com/
 
 Verify installation:
 
-
+'''
 
 git --version
 
-
+'''
 
 
 
@@ -84,71 +86,69 @@ git --version
 
 Open Command Prompt (CMD) and run:
 
-
+'''cmd
 
 git clone https://github.com/gkhater/AES-modes.git
 
 cd AES-modes
 
-
-
-
-
-You should now see the following structure:
-
-
-
-AES-modes/
-
-│
-
-├── frontend/
-
-└── server/
+'''
 
 
 
 3\. Run the Backend (Flask Server)
 
+
+
 3.1 Navigate to the backend folder
+
+'''
 
 cd server
 
-
+'''
 
 3.2 Create a virtual environment
 
+'''
+
 python -m venv .venv
 
-
+'''cmd
 
 3.3 Activate the virtual environment (CMD)
 
+'''cmd
+
 .\\.venv\\Scripts\\activate
 
-
+'''
 
 
 
 The command prompt should now show:
 
-
+'''
 
 (.venv) ...
 
-
+'''
 
 3.4 Install Python dependencies
 
+'''
+
 pip install -r requirements.txt
 
-
+'''
 
 3.5 Start the Flask server
 
+'''
+
 python server.py
 
-
+'''
 
 
 
@@ -178,35 +178,43 @@ Open a new CMD window.
 
 4.1 Navigate to the frontend folder
 
+'''
+
 cd AES-modes\\frontend
+
+'''
 
 
 
 4.2 Install frontend dependencies
 
+'''
+
 npm install
 
-
+'''
 
 4.3 Start the development server
 
+'''
+
 npm run dev
 
-
+'''
 
 
 
 Expected output:
 
-
+'''
 
 Local: http://localhost:5173/
 
+'''
 
 
 
-
-Open this URL in a web browser.
+Open this URL in a web browser, and the webapp should run.
 
 
 
